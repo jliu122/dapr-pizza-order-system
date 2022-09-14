@@ -1,5 +1,6 @@
 .DS_Store
 .idea/
+/components/.idea/
 PizzaOrderProcessor/.idea/
 PizzaOrderProcessor/bin/
 PizzaOrderProcessor/obj/
