@@ -1,0 +1,10 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: servicebus-pubsub # This is the "pubsub" field name in the Dapr Pubsub Endpoint. If the provided pubsub not found, it will return 404 errors
+spec:
+  type: pubsub.azure.servicebus
+  version: v1
+  metadata:
+    - name: connectionString # Required when not using Azure Authentication.
+      value: "Endpoint=sb://pangpang-demo.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=tv8wO4z/cVpvTIJOM/I3SV4euL3yWDN2kVrp5twah6g=" # Pangpang's personal service bus topic
