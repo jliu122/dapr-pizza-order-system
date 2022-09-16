@@ -53,6 +53,7 @@ app.MapPost("/order/status", (DaprData<OrderStatus> requestData) => {
 // Post order
 app.MapPost("/order", (DaprData<Order> requestData) => {
     var order = requestData.Data;
+    order.Status ??= "created";
     // write the order information into state store
     var orderInfoJson = JsonSerializer.Serialize(
         new[] {
@@ -67,7 +68,7 @@ app.MapPost("/order", (DaprData<Order> requestData) => {
     httpClient.PostAsync(stateStoreBaseUrl, state);
     Console.WriteLine("Saving Order: " + order);
     
-    return Results.Ok(order);
+    return Results.Ok();
 });
 
 await app.RunAsync();
