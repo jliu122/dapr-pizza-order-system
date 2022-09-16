@@ -29,8 +29,8 @@ app.MapGet("/order/{orderId}", (string orderId) => {
 });
 
 // Update order status by orderId
-app.MapPost("/order/status", (HttpRequest request) => {
-    var orderStatus = request.ReadFromJsonAsync<OrderStatus>().Result;
+app.MapPost("/order/status", (DaprData<OrderStatus> requestData) => {
+    var orderStatus = requestData.Data;
     // fetch order from cosmosdb state store by orderId
     var resp = httpClient.GetStringAsync($"{stateStoreBaseUrl}/{orderStatus.OrderId.ToString()}");
     var order = JsonSerializer.Deserialize<Order>(resp.Result)!;
@@ -51,9 +51,8 @@ app.MapPost("/order/status", (HttpRequest request) => {
 });
 
 // Post order
-app.MapPost("/order", (DaprData<string> requestData) => {
-    var jsonString = requestData.Data;
-    var order = JsonSerializer.Deserialize<Order>(jsonString)!;
+app.MapPost("/order", (DaprData<Order> requestData) => {
+    var order = requestData.Data;
     // write the order information into state store
     var orderInfoJson = JsonSerializer.Serialize(
         new[] {
@@ -68,7 +67,7 @@ app.MapPost("/order", (DaprData<string> requestData) => {
     httpClient.PostAsync(stateStoreBaseUrl, state);
     Console.WriteLine("Saving Order: " + order);
     
-    return Results.Ok(requestData.Data);
+    return Results.Ok(order);
 });
 
 await app.RunAsync();
