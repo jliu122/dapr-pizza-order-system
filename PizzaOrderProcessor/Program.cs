@@ -1,48 +1,76 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using PizzaOrderProcessor.models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var app = builder.Build();
 
+const string stateStoreBaseUrl = "http://localhost:3500/v1.0/state/cosmosdb-state";
+var httpClient = new HttpClient();
+httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
 if (app.Environment.IsDevelopment()) {app.UseDeveloperExceptionPage();}
 
 // Register Dapr pub/sub subscriptions
 app.MapGet("/dapr/subscribe", () => {
-    var sub = new DaprSubscription(PubsubName: "servicebus-pubsub", Topic: "order", Route: "order");
+    var sub = new DaprSubscription("servicebus-pubsub", "order", "order");
     Console.WriteLine("Dapr pub/sub is subscribed to: " + sub);
     return Results.Json(new DaprSubscription[]{sub});
 });
 
-// Dapr subscription in /dapr/subscribe sets up this route
+// Get order by orderId
+app.MapGet("/order/{orderId}", (string orderId) => {
+    // fetch order from cosmosdb state store by orderId
+    var resp = httpClient.GetStringAsync($"{stateStoreBaseUrl}/{orderId.ToString()}");
+    var order = JsonSerializer.Deserialize<Order>(resp.Result)!;
+    return Results.Ok(order);
+});
+
+// Update order status by orderId
+app.MapPost("/order/status", (HttpRequest request) => {
+    var orderStatus = request.ReadFromJsonAsync<OrderStatus>().Result;
+    // fetch order from cosmosdb state store by orderId
+    var resp = httpClient.GetStringAsync($"{stateStoreBaseUrl}/{orderStatus.OrderId.ToString()}");
+    var order = JsonSerializer.Deserialize<Order>(resp.Result)!;
+    // update order status
+    order.Status = orderStatus.Status;
+    // post the updated order to cosmosdb state store
+    var orderInfoJson = JsonSerializer.Serialize(
+        new[] {
+            new {
+                key = order.OrderId.ToString(),
+                value = order
+            }
+        }
+    );
+    var state = new StringContent(orderInfoJson, Encoding.UTF8, "application/json");
+    httpClient.PostAsync(stateStoreBaseUrl, state);
+    return Results.Ok(order);
+});
+
+// Post order
 app.MapPost("/order", (DaprData<string> requestData) => {
-    Console.WriteLine("Subscriber received : " + requestData.Data);
     var jsonString = requestData.Data;
     var order = JsonSerializer.Deserialize<Order>(jsonString)!;
-    Console.WriteLine("order id is: " + order.OrderId);
-    foreach (var pizza in order.Cart) {
-        Console.WriteLine("pizza name: " + pizza.Name);
-        Console.WriteLine("pizza count: " + pizza.Count);
-        Console.WriteLine("pizza price: " + pizza.Price);
-    }
+    // write the order information into state store
+    var orderInfoJson = JsonSerializer.Serialize(
+        new[] {
+            new {
+                key = order.OrderId.ToString(),
+                value = order
+            }
+        }
+    );
+    // write into cosmosdb
+    var state = new StringContent(orderInfoJson, Encoding.UTF8, "application/json");
+    httpClient.PostAsync(stateStoreBaseUrl, state);
+    Console.WriteLine("Saving Order: " + order);
+    
     return Results.Ok(requestData.Data);
 });
 
 await app.RunAsync();
 
 public record DaprData<T> ([property: JsonPropertyName("data")] T Data);
-
-public record Pizza(
-    [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("price")] float Price,
-    [property: JsonPropertyName("count")] int Count
-);
-public record Order(
-    [property: JsonPropertyName("orderId")] int OrderId,
-    [property: JsonPropertyName("cart")] List<Pizza> Cart
-);
-
-public record DaprSubscription(
-    [property: JsonPropertyName("pubsubname")] string PubsubName, 
-    [property: JsonPropertyName("topic")] string Topic, 
-    [property: JsonPropertyName("route")] string Route);

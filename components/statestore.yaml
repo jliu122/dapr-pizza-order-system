@@ -1,0 +1,18 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: cosmosdb-state
+spec:
+  type: state.azure.cosmosdb
+  version: v1
+  metadata:
+    - name: url
+      value: https://pangpang-cosmos-db-demo.documents.azure.com:443/
+    - name: masterKey
+      value: xuAnhK4H6xUu0oadDlNKEU7i3NxLh26oD4yfjBnIZ9gqQD6hg3TzstZIfrEtc6sVIJPr08ZDbKoMRQ0OROPaig==
+    - name: database
+      value: pangpang-demo-db
+    - name: collection
+      value: pangpang-demo-container
+    - name: partitionKey
+      value: orderID
